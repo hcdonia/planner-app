@@ -1,5 +1,7 @@
 """Google Calendar service - refactored from app.py."""
 import os
+import json
+import base64
 import datetime as dt
 from typing import List, Optional, Tuple, Dict, Any
 from zoneinfo import ZoneInfo
@@ -35,16 +37,29 @@ class CalendarService:
     def _authenticate(self):
         """Authenticate with Google Calendar API."""
         creds = None
-        token_path = str(settings.TOKEN_PATH)
-        creds_path = str(settings.CREDENTIALS_PATH)
 
-        if os.path.exists(token_path):
-            creds = Credentials.from_authorized_user_file(token_path, settings.GOOGLE_SCOPES)
+        # Check for base64-encoded credentials from environment (for cloud deployment)
+        if settings.GOOGLE_TOKEN_JSON:
+            try:
+                token_data = base64.b64decode(settings.GOOGLE_TOKEN_JSON).decode('utf-8')
+                token_dict = json.loads(token_data)
+                creds = Credentials.from_authorized_user_info(token_dict, settings.GOOGLE_SCOPES)
+            except Exception as e:
+                raise RuntimeError(f"Failed to load token from GOOGLE_TOKEN_JSON: {e}")
+        else:
+            # Fallback to file-based auth for local development
+            token_path = str(settings.TOKEN_PATH)
+            creds_path = str(settings.CREDENTIALS_PATH)
+
+            if os.path.exists(token_path):
+                creds = Credentials.from_authorized_user_file(token_path, settings.GOOGLE_SCOPES)
 
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
                 creds.refresh(Request())
-            else:
+            elif not settings.GOOGLE_TOKEN_JSON:
+                # Only try OAuth flow for local development
+                creds_path = str(settings.CREDENTIALS_PATH)
                 if not os.path.exists(creds_path):
                     raise RuntimeError(
                         f"Missing credentials.json at {creds_path}. "
@@ -53,8 +68,8 @@ class CalendarService:
                 flow = InstalledAppFlow.from_client_secrets_file(creds_path, settings.GOOGLE_SCOPES)
                 creds = flow.run_local_server(port=0)
 
-            with open(token_path, "w", encoding="utf-8") as f:
-                f.write(creds.to_json())
+                with open(str(settings.TOKEN_PATH), "w", encoding="utf-8") as f:
+                    f.write(creds.to_json())
 
         return build("calendar", "v3", credentials=creds)
 
