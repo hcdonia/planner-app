@@ -109,3 +109,12 @@ body {
 .markdown-content pre code {
   @apply bg-transparent p-0;
 }
+
+/* Safe area insets for iOS devices */
+.pb-safe {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+.mb-safe {
+  margin-bottom: env(safe-area-inset-bottom);
+}

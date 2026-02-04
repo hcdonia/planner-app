@@ -29,7 +29,7 @@ function InputBar({ onSend, disabled, placeholder = "Type a message..." }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="border-t border-gray-200 bg-white p-4">
+    <form onSubmit={handleSubmit} className="border-t border-gray-200 bg-white p-4 pb-safe">
       <div className="flex items-end gap-3 max-w-4xl mx-auto">
         <div className="flex-1 relative">
           <textarea

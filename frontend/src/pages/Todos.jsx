@@ -179,7 +179,7 @@ function Todos() {
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto px-4 py-6">
+      <div className="max-w-2xl mx-auto px-4 py-6 pb-safe">
         {/* Add Todo Form */}
         <form onSubmit={handleAddTodo} className="mb-6">
           <div className="flex gap-2">
