@@ -56,3 +56,25 @@ def init_db():
     """Initialize database tables."""
     from . import models  # noqa: F401 - Import to register models
     Base.metadata.create_all(bind=engine)
+
+    # Run migrations for existing tables
+    _run_migrations()
+
+
+def _run_migrations():
+    """Run any necessary migrations for existing tables."""
+    from sqlalchemy import text, inspect
+
+    with engine.connect() as conn:
+        inspector = inspect(engine)
+
+        # Check if todo_items table exists and has start_date column
+        if 'todo_items' in inspector.get_table_names():
+            columns = [col['name'] for col in inspector.get_columns('todo_items')]
+            if 'start_date' not in columns:
+                # Add start_date column
+                try:
+                    conn.execute(text('ALTER TABLE todo_items ADD COLUMN start_date TIMESTAMP'))
+                    conn.commit()
+                except Exception:
+                    pass  # Column might already exist or other issue

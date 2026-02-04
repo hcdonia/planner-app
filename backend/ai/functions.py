@@ -8,6 +8,7 @@ from ..config import get_settings
 from ..services.calendar_service import CalendarService
 from ..services.knowledge_service import KnowledgeService
 from ..services.memory_service import MemoryService
+from ..models.database import TodoItem
 
 settings = get_settings()
 
@@ -276,6 +277,123 @@ AI_FUNCTIONS = [
                     },
                 },
                 "required": ["calendar_id"],
+            },
+        },
+    },
+    # ============ Todo List Operations ============
+    {
+        "type": "function",
+        "function": {
+            "name": "add_todo",
+            "description": "Add a new task to the to-do list",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string",
+                        "description": "Title of the task",
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Optional description or notes for the task",
+                    },
+                    "priority": {
+                        "type": "string",
+                        "enum": ["high", "medium", "low"],
+                        "description": "Priority level of the task",
+                        "default": "medium",
+                    },
+                    "start_date": {
+                        "type": "string",
+                        "description": "When to start working on the task (ISO format or natural language like 'tomorrow', 'next Monday')",
+                    },
+                    "due_date": {
+                        "type": "string",
+                        "description": "Deadline for the task (ISO format or natural language)",
+                    },
+                    "estimated_minutes": {
+                        "type": "integer",
+                        "description": "Estimated time to complete in minutes",
+                    },
+                },
+                "required": ["title"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_todos",
+            "description": "Get all tasks from the to-do list",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "include_completed": {
+                        "type": "boolean",
+                        "description": "Whether to include completed tasks",
+                        "default": False,
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "update_todo",
+            "description": "Update an existing to-do item",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "todo_id": {
+                        "type": "integer",
+                        "description": "ID of the todo to update",
+                    },
+                    "title": {
+                        "type": "string",
+                        "description": "New title",
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "New description",
+                    },
+                    "priority": {
+                        "type": "string",
+                        "enum": ["high", "medium", "low"],
+                        "description": "New priority",
+                    },
+                    "start_date": {
+                        "type": "string",
+                        "description": "New start date",
+                    },
+                    "due_date": {
+                        "type": "string",
+                        "description": "New due date",
+                    },
+                    "completed": {
+                        "type": "boolean",
+                        "description": "Mark as completed or incomplete",
+                    },
+                },
+                "required": ["todo_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "delete_todo",
+            "description": "Delete a to-do item",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "todo_id": {
+                        "type": "integer",
+                        "description": "ID of the todo to delete",
+                    },
+                },
+                "required": ["todo_id"],
             },
         },
     },
@@ -581,6 +699,199 @@ def execute_function(
             return {
                 "success": success,
                 "message": "Calendar removed" if success else "Calendar not found",
+            }
+
+        # ============ Todo List Operations ============
+        elif function_name == "add_todo":
+            title = arguments["title"]
+            description = arguments.get("description")
+            priority = arguments.get("priority", "medium")
+            start_date_str = arguments.get("start_date")
+            due_date_str = arguments.get("due_date")
+            estimated_minutes = arguments.get("estimated_minutes")
+
+            # Parse dates
+            now = dt.datetime.now(tz)
+            start_date = None
+            due_date = None
+
+            def parse_date_string(date_str: str) -> Optional[dt.datetime]:
+                if not date_str:
+                    return None
+                date_lower = date_str.lower()
+                # Try ISO format first
+                try:
+                    parsed = dt.datetime.fromisoformat(date_str)
+                    if parsed.tzinfo is None:
+                        parsed = parsed.replace(tzinfo=tz)
+                    return parsed
+                except ValueError:
+                    pass
+                # Natural language parsing
+                if "today" in date_lower:
+                    return now.replace(hour=9, minute=0, second=0, microsecond=0)
+                elif "tomorrow" in date_lower:
+                    return (now + dt.timedelta(days=1)).replace(hour=9, minute=0, second=0, microsecond=0)
+                elif "next week" in date_lower:
+                    days_ahead = (0 - now.weekday()) % 7 + 7
+                    return (now + dt.timedelta(days=days_ahead)).replace(hour=9, minute=0, second=0, microsecond=0)
+                # Check for day names
+                days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+                for i, day in enumerate(days):
+                    if day in date_lower:
+                        days_ahead = (i - now.weekday()) % 7
+                        if days_ahead == 0:
+                            days_ahead = 7
+                        return (now + dt.timedelta(days=days_ahead)).replace(hour=9, minute=0, second=0, microsecond=0)
+                return None
+
+            start_date = parse_date_string(start_date_str) if start_date_str else None
+            due_date = parse_date_string(due_date_str) if due_date_str else None
+
+            # Create the todo
+            todo = TodoItem(
+                title=title,
+                description=description,
+                priority=priority,
+                start_date=start_date,
+                due_date=due_date,
+                estimated_minutes=estimated_minutes,
+            )
+            db.add(todo)
+            db.commit()
+            db.refresh(todo)
+
+            response_parts = [f"Added '{title}' to your to-do list"]
+            if start_date:
+                response_parts.append(f"starting {start_date.strftime('%A, %B %d')}")
+            if due_date:
+                response_parts.append(f"due {due_date.strftime('%A, %B %d')}")
+
+            return {
+                "success": True,
+                "message": ", ".join(response_parts),
+                "todo_id": todo.id,
+            }
+
+        elif function_name == "get_todos":
+            include_completed = arguments.get("include_completed", False)
+            query = db.query(TodoItem)
+            if not include_completed:
+                query = query.filter(TodoItem.completed == False)
+            todos = query.all()
+
+            return {
+                "success": True,
+                "todos": [
+                    {
+                        "id": t.id,
+                        "title": t.title,
+                        "description": t.description,
+                        "priority": t.priority,
+                        "start_date": t.start_date.isoformat() if t.start_date else None,
+                        "due_date": t.due_date.isoformat() if t.due_date else None,
+                        "completed": t.completed,
+                    }
+                    for t in todos
+                ],
+            }
+
+        elif function_name == "update_todo":
+            todo_id = arguments["todo_id"]
+            todo = db.query(TodoItem).filter(TodoItem.id == todo_id).first()
+            if not todo:
+                return {"success": False, "message": f"Todo with ID {todo_id} not found"}
+
+            # Update fields
+            if "title" in arguments:
+                todo.title = arguments["title"]
+            if "description" in arguments:
+                todo.description = arguments["description"]
+            if "priority" in arguments:
+                todo.priority = arguments["priority"]
+            if "start_date" in arguments:
+                start_date_str = arguments["start_date"]
+                if start_date_str:
+                    def parse_date_string(date_str: str) -> Optional[dt.datetime]:
+                        if not date_str:
+                            return None
+                        date_lower = date_str.lower()
+                        try:
+                            parsed = dt.datetime.fromisoformat(date_str)
+                            if parsed.tzinfo is None:
+                                parsed = parsed.replace(tzinfo=tz)
+                            return parsed
+                        except ValueError:
+                            pass
+                        if "today" in date_lower:
+                            return now.replace(hour=9, minute=0, second=0, microsecond=0)
+                        elif "tomorrow" in date_lower:
+                            return (now + dt.timedelta(days=1)).replace(hour=9, minute=0, second=0, microsecond=0)
+                        days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+                        for i, day in enumerate(days):
+                            if day in date_lower:
+                                days_ahead = (i - now.weekday()) % 7
+                                if days_ahead == 0:
+                                    days_ahead = 7
+                                return (now + dt.timedelta(days=days_ahead)).replace(hour=9, minute=0, second=0, microsecond=0)
+                        return None
+                    todo.start_date = parse_date_string(start_date_str)
+                else:
+                    todo.start_date = None
+            if "due_date" in arguments:
+                due_date_str = arguments["due_date"]
+                if due_date_str:
+                    def parse_date_string(date_str: str) -> Optional[dt.datetime]:
+                        if not date_str:
+                            return None
+                        date_lower = date_str.lower()
+                        try:
+                            parsed = dt.datetime.fromisoformat(date_str)
+                            if parsed.tzinfo is None:
+                                parsed = parsed.replace(tzinfo=tz)
+                            return parsed
+                        except ValueError:
+                            pass
+                        if "today" in date_lower:
+                            return now.replace(hour=9, minute=0, second=0, microsecond=0)
+                        elif "tomorrow" in date_lower:
+                            return (now + dt.timedelta(days=1)).replace(hour=9, minute=0, second=0, microsecond=0)
+                        days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+                        for i, day in enumerate(days):
+                            if day in date_lower:
+                                days_ahead = (i - now.weekday()) % 7
+                                if days_ahead == 0:
+                                    days_ahead = 7
+                                return (now + dt.timedelta(days=days_ahead)).replace(hour=9, minute=0, second=0, microsecond=0)
+                        return None
+                    todo.due_date = parse_date_string(due_date_str)
+                else:
+                    todo.due_date = None
+            if "completed" in arguments:
+                todo.completed = arguments["completed"]
+                if todo.completed:
+                    todo.completed_at = dt.datetime.now(tz)
+                else:
+                    todo.completed_at = None
+
+            db.commit()
+            return {
+                "success": True,
+                "message": f"Updated todo '{todo.title}'",
+            }
+
+        elif function_name == "delete_todo":
+            todo_id = arguments["todo_id"]
+            todo = db.query(TodoItem).filter(TodoItem.id == todo_id).first()
+            if not todo:
+                return {"success": False, "message": f"Todo with ID {todo_id} not found"}
+
+            title = todo.title
+            db.delete(todo)
+            db.commit()
+            return {
+                "success": True,
+                "message": f"Deleted todo '{title}'",
             }
 
         else:

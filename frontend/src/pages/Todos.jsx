@@ -9,8 +9,30 @@ function Todos() {
   const [newTodo, setNewTodo] = useState('')
   const [editingId, setEditingId] = useState(null)
   const [editText, setEditText] = useState('')
+  const [editingDateField, setEditingDateField] = useState(null) // {id, field}
 
   const { getTodos, createTodo, updateTodo, deleteTodo, toggleTodo } = useApi()
+
+  // Format date for display
+  const formatDate = (dateStr) => {
+    if (!dateStr) return null
+    const date = new Date(dateStr)
+    const today = new Date()
+    const tomorrow = new Date(today)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+
+    if (date.toDateString() === today.toDateString()) return 'Today'
+    if (date.toDateString() === tomorrow.toDateString()) return 'Tomorrow'
+
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  }
+
+  // Format date for input field
+  const formatDateForInput = (dateStr) => {
+    if (!dateStr) return ''
+    const date = new Date(dateStr)
+    return date.toISOString().split('T')[0]
+  }
 
   useEffect(() => {
     loadTodos()
@@ -84,6 +106,18 @@ function Todos() {
     }
   }
 
+  const handleDateChange = async (id, field, value) => {
+    try {
+      const update = {}
+      update[field] = value ? new Date(value).toISOString() : null
+      await updateTodo(id, update)
+      setEditingDateField(null)
+      loadTodos()
+    } catch (err) {
+      alert('Failed to update date: ' + err.message)
+    }
+  }
+
   const priorityColors = {
     high: 'bg-red-100 text-red-700 border-red-200',
     medium: 'bg-yellow-100 text-yellow-700 border-yellow-200',
@@ -154,60 +188,88 @@ function Todos() {
                 </div>
               ) : (
                 incompleteTodos.map((todo) => (
-                  <div key={todo.id} className="p-3 sm:p-4 flex items-start sm:items-center gap-3 group">
-                    <button
-                      onClick={() => handleToggle(todo.id)}
-                      className="w-6 h-6 mt-0.5 sm:mt-0 flex-shrink-0 rounded-full border-2 border-gray-300 hover:border-primary-500 flex items-center justify-center transition-colors"
-                    >
-                      <svg className="w-4 h-4 text-gray-300 group-hover:text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    </button>
+                  <div key={todo.id} className="p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 group">
+                    <div className="flex items-start sm:items-center gap-3 flex-1 min-w-0">
+                      <button
+                        onClick={() => handleToggle(todo.id)}
+                        className="w-6 h-6 mt-0.5 sm:mt-0 flex-shrink-0 rounded-full border-2 border-gray-300 hover:border-primary-500 flex items-center justify-center transition-colors"
+                      >
+                        <svg className="w-4 h-4 text-gray-300 group-hover:text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </button>
 
-                    <div className="flex-1 min-w-0">
-                      {editingId === todo.id ? (
-                        <input
-                          type="text"
-                          value={editText}
-                          onChange={(e) => setEditText(e.target.value)}
-                          onBlur={() => handleSaveEdit(todo.id)}
-                          onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit(todo.id)}
-                          className="w-full px-2 py-1 border border-primary-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
-                          autoFocus
-                        />
-                      ) : (
-                        <span
-                          className="block text-gray-800 cursor-pointer break-words"
-                          onClick={() => handleEdit(todo)}
-                        >
-                          {todo.title}
-                        </span>
-                      )}
-
-                      {/* Priority and delete on separate row on mobile */}
-                      <div className="flex items-center gap-2 mt-2 sm:hidden">
-                        <select
-                          value={todo.priority}
-                          onChange={(e) => handlePriorityChange(todo.id, e.target.value)}
-                          className={`px-2 py-1 text-xs font-medium rounded border ${priorityColors[todo.priority]}`}
-                        >
-                          <option value="high">High</option>
-                          <option value="medium">Medium</option>
-                          <option value="low">Low</option>
-                        </select>
-                        <button
-                          onClick={() => handleDelete(todo.id)}
-                          className="text-gray-400 hover:text-red-500 p-1"
-                        >
-                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
+                      <div className="flex-1 min-w-0">
+                        {editingId === todo.id ? (
+                          <input
+                            type="text"
+                            value={editText}
+                            onChange={(e) => setEditText(e.target.value)}
+                            onBlur={() => handleSaveEdit(todo.id)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit(todo.id)}
+                            className="w-full px-2 py-1 border border-primary-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            autoFocus
+                          />
+                        ) : (
+                          <span
+                            className="block text-gray-800 cursor-pointer break-words"
+                            onClick={() => handleEdit(todo)}
+                          >
+                            {todo.title}
+                          </span>
+                        )}
                       </div>
                     </div>
 
-                    {/* Priority and delete inline on desktop */}
-                    <div className="hidden sm:flex items-center gap-2">
+                    {/* Dates and controls row */}
+                    <div className="flex flex-wrap items-center gap-2 pl-9 sm:pl-0">
+                      {/* Start Date */}
+                      {editingDateField?.id === todo.id && editingDateField?.field === 'start_date' ? (
+                        <input
+                          type="date"
+                          defaultValue={formatDateForInput(todo.start_date)}
+                          onChange={(e) => handleDateChange(todo.id, 'start_date', e.target.value)}
+                          onBlur={() => setEditingDateField(null)}
+                          className="px-2 py-1 text-xs border border-primary-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+                          autoFocus
+                        />
+                      ) : (
+                        <button
+                          onClick={() => setEditingDateField({ id: todo.id, field: 'start_date' })}
+                          className={`px-2 py-1 text-xs rounded border ${
+                            todo.start_date
+                              ? 'bg-blue-50 text-blue-600 border-blue-200'
+                              : 'bg-gray-50 text-gray-400 border-gray-200 border-dashed'
+                          }`}
+                        >
+                          {todo.start_date ? `Start: ${formatDate(todo.start_date)}` : '+ Start'}
+                        </button>
+                      )}
+
+                      {/* Due Date */}
+                      {editingDateField?.id === todo.id && editingDateField?.field === 'due_date' ? (
+                        <input
+                          type="date"
+                          defaultValue={formatDateForInput(todo.due_date)}
+                          onChange={(e) => handleDateChange(todo.id, 'due_date', e.target.value)}
+                          onBlur={() => setEditingDateField(null)}
+                          className="px-2 py-1 text-xs border border-primary-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+                          autoFocus
+                        />
+                      ) : (
+                        <button
+                          onClick={() => setEditingDateField({ id: todo.id, field: 'due_date' })}
+                          className={`px-2 py-1 text-xs rounded border ${
+                            todo.due_date
+                              ? 'bg-orange-50 text-orange-600 border-orange-200'
+                              : 'bg-gray-50 text-gray-400 border-gray-200 border-dashed'
+                          }`}
+                        >
+                          {todo.due_date ? `Due: ${formatDate(todo.due_date)}` : '+ Due'}
+                        </button>
+                      )}
+
+                      {/* Priority */}
                       <select
                         value={todo.priority}
                         onChange={(e) => handlePriorityChange(todo.id, e.target.value)}
@@ -217,9 +279,11 @@ function Todos() {
                         <option value="medium">Medium</option>
                         <option value="low">Low</option>
                       </select>
+
+                      {/* Delete */}
                       <button
                         onClick={() => handleDelete(todo.id)}
-                        className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-all"
+                        className="sm:opacity-0 sm:group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-all p-1"
                       >
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />

@@ -32,8 +32,9 @@ def get_todos(
     # Sort in Python for flexibility
     def sort_key(t):
         priority_val = priority_order.get(t.priority, 2)
+        start_val = t.start_date if t.start_date else datetime.max
         due_val = t.due_date if t.due_date else datetime.max
-        return (t.completed, priority_val, due_val)
+        return (t.completed, priority_val, start_val, due_val)
     
     return sorted(todos, key=sort_key)
 
@@ -45,6 +46,7 @@ def create_todo(todo: TodoItemCreate, db: Session = Depends(get_db)):
         title=todo.title,
         description=todo.description,
         priority=todo.priority,
+        start_date=todo.start_date,
         due_date=todo.due_date,
         estimated_minutes=todo.estimated_minutes,
     )

@@ -133,7 +133,8 @@ class TodoItem(Base):
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     priority = Column(String(20), default="medium")  # 'high', 'medium', 'low'
-    due_date = Column(DateTime, nullable=True)
+    start_date = Column(DateTime, nullable=True)  # When to start working on it
+    due_date = Column(DateTime, nullable=True)  # Deadline
     estimated_minutes = Column(Integer, nullable=True)
     completed = Column(Boolean, default=False)
     completed_at = Column(DateTime, nullable=True)

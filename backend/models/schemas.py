@@ -218,6 +218,7 @@ class TodoItemBase(BaseModel):
     title: str
     description: Optional[str] = None
     priority: str = "medium"  # 'high', 'medium', 'low'
+    start_date: Optional[datetime] = None
     due_date: Optional[datetime] = None
     estimated_minutes: Optional[int] = None
 
@@ -230,6 +231,7 @@ class TodoItemUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     priority: Optional[str] = None
+    start_date: Optional[datetime] = None
     due_date: Optional[datetime] = None
     estimated_minutes: Optional[int] = None
     completed: Optional[bool] = None
@@ -237,6 +239,7 @@ class TodoItemUpdate(BaseModel):
 
 class TodoItemResponse(TodoItemBase):
     id: int
+    start_date: Optional[datetime] = None
     completed: bool
     completed_at: Optional[datetime] = None
     scheduled_event_id: Optional[str] = None
