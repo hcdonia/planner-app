@@ -30,12 +30,16 @@ def get_todos(
     todos = query.all()
     
     # Sort in Python for flexibility
+    # Use a far future date for None values (avoid timezone issues with datetime.max)
+    far_future = datetime(9999, 12, 31)
+
     def sort_key(t):
         priority_val = priority_order.get(t.priority, 2)
-        start_val = t.start_date if t.start_date else datetime.max
-        due_val = t.due_date if t.due_date else datetime.max
+        # Handle both naive and timezone-aware datetimes
+        start_val = t.start_date.replace(tzinfo=None) if t.start_date else far_future
+        due_val = t.due_date.replace(tzinfo=None) if t.due_date else far_future
         return (t.completed, priority_val, start_val, due_val)
-    
+
     return sorted(todos, key=sort_key)
 
 
