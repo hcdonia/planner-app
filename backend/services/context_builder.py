@@ -1,7 +1,7 @@
 """Context builder - builds dynamic prompts for the AI."""
 import datetime as dt
 import json
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 from zoneinfo import ZoneInfo
 from sqlalchemy.orm import Session
 
@@ -205,10 +205,16 @@ No calendars configured yet. Ask the user which calendars they want to track."""
     def build_messages_for_ai(
         self,
         conversation_id: int,
-        user_message: str,
+        user_message: Union[str, List[Dict]],
         max_history: int = 20,
-    ) -> List[Dict[str, str]]:
-        """Build the complete messages array for OpenAI API."""
+    ) -> List[Dict[str, Any]]:
+        """Build the complete messages array for OpenAI API.
+
+        Args:
+            conversation_id: The conversation ID
+            user_message: Either a string or a content array (for images/vision)
+            max_history: Number of history messages to include
+        """
         messages = []
 
         # System prompt
@@ -225,7 +231,7 @@ No calendars configured yet. Ask the user which calendars they want to track."""
                 "content": msg.content,
             })
 
-        # Current user message
+        # Current user message (can be string or content array for vision)
         messages.append({
             "role": "user",
             "content": user_message,

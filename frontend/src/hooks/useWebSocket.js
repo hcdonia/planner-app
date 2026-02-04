@@ -125,10 +125,25 @@ export function useWebSocket(conversationId, onTitleUpdate) {
     }
   }, [connect])
 
-  const sendMessage = useCallback((message) => {
+  const sendMessage = useCallback((messageData) => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      setMessages((prev) => [...prev, { role: 'user', content: message }])
-      wsRef.current.send(JSON.stringify({ message }))
+      // Handle both string messages (legacy) and object messages with files
+      const text = typeof messageData === 'string' ? messageData : messageData.text
+      const files = typeof messageData === 'object' ? messageData.files : []
+
+      // Add user message to UI with file indicators
+      const userMessage = {
+        role: 'user',
+        content: text,
+        files: files
+      }
+      setMessages((prev) => [...prev, userMessage])
+
+      // Send to WebSocket
+      wsRef.current.send(JSON.stringify({
+        message: text,
+        files: files
+      }))
     }
   }, [])
 

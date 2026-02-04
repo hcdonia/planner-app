@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .database import init_db
 from .config import get_settings
-from .api import chat_router, calendar_router, knowledge_router, settings_router, todos_router
+from .api import chat_router, calendar_router, knowledge_router, settings_router, todos_router, files_router
 
 settings = get_settings()
 
@@ -33,6 +33,7 @@ app.include_router(calendar_router)
 app.include_router(knowledge_router)
 app.include_router(settings_router)
 app.include_router(todos_router)
+app.include_router(files_router)
 
 
 @app.get("/")

@@ -25,8 +25,11 @@ class Settings(BaseSettings):
     # OpenAI Configuration
     OPENAI_MODEL: str = "gpt-4o"
 
-    # Google Calendar - support base64 encoded credentials for cloud deployment
-    GOOGLE_SCOPES: list = ["https://www.googleapis.com/auth/calendar"]
+    # Google Calendar & Drive - support base64 encoded credentials for cloud deployment
+    GOOGLE_SCOPES: list = [
+        "https://www.googleapis.com/auth/calendar",
+        "https://www.googleapis.com/auth/drive.file"  # Access to files created by this app
+    ]
     GOOGLE_CREDENTIALS_JSON: Optional[str] = None  # Base64 encoded credentials.json
     GOOGLE_TOKEN_JSON: Optional[str] = None  # Base64 encoded token.json
 

@@ -208,6 +208,46 @@ export function useApi() {
     [request]
   )
 
+  // File upload endpoints
+  const uploadFile = useCallback(
+    async (file, subfolder = 'chat') => {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('subfolder', subfolder)
+
+      const response = await fetch(`${API_BASE}/api/files/upload`, {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.detail || 'Upload failed')
+      }
+
+      return response.json()
+    },
+    []
+  )
+
+  const getFileContent = useCallback(
+    (fileId) => request(`/api/files/${fileId}/content`),
+    [request]
+  )
+
+  const deleteFile = useCallback(
+    (fileId) => request(`/api/files/${fileId}`, { method: 'DELETE' }),
+    [request]
+  )
+
+  const listFiles = useCallback(
+    (subfolder = null) => {
+      const params = subfolder ? `?subfolder=${subfolder}` : ''
+      return request(`/api/files/list${params}`)
+    },
+    [request]
+  )
+
   return {
     loading,
     error,
@@ -246,5 +286,10 @@ export function useApi() {
     updateTodo,
     deleteTodo,
     toggleTodo,
+    // Files
+    uploadFile,
+    getFileContent,
+    deleteFile,
+    listFiles,
   }
 }

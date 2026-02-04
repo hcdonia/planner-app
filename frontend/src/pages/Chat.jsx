@@ -12,8 +12,9 @@ function Chat() {
   const [conversations, setConversations] = useState([])
   const [showCalendar, setShowCalendar] = useState(false)
   const [showSidebar, setShowSidebar] = useState(false)
+  const [uploading, setUploading] = useState(false)
 
-  const { createConversation, getConversations, getConversation, deleteConversation } = useApi()
+  const { createConversation, getConversations, getConversation, deleteConversation, uploadFile } = useApi()
 
   // Callback for when conversation title is auto-generated
   const handleTitleUpdate = useCallback((title) => {
@@ -75,7 +76,17 @@ function Chat() {
   }
 
   const handleSend = useCallback(
-    (message) => {
+    (message, attachedFiles = []) => {
+      // Build message with file attachments
+      const messageData = {
+        text: message,
+        files: attachedFiles.map(f => ({
+          id: f.id,
+          name: f.name,
+          mime_type: f.mime_type
+        }))
+      }
+
       if (!conversationId) {
         // Create new conversation first
         createConversation()
@@ -83,14 +94,27 @@ function Chat() {
             setConversationId(conv.id)
             loadConversations()
             // Send message after a short delay to allow WebSocket to connect
-            setTimeout(() => sendMessage(message), 500)
+            setTimeout(() => sendMessage(messageData), 500)
           })
           .catch((err) => console.error('Failed to create conversation:', err))
       } else {
-        sendMessage(message)
+        sendMessage(messageData)
       }
     },
     [conversationId, sendMessage, createConversation]
+  )
+
+  const handleFileUpload = useCallback(
+    async (file) => {
+      setUploading(true)
+      try {
+        const result = await uploadFile(file, 'chat')
+        return result
+      } finally {
+        setUploading(false)
+      }
+    },
+    [uploadFile]
   )
 
   const handleDeleteConversation = async (id) => {
@@ -204,6 +228,8 @@ function Chat() {
         {/* Input */}
         <InputBar
           onSend={handleSend}
+          onFileUpload={handleFileUpload}
+          uploading={uploading}
           disabled={!isConnected && conversationId}
           placeholder={
             conversationId

@@ -43,12 +43,13 @@ async def chat_websocket(
             data = await websocket.receive_text()
             message_data = json.loads(data)
             user_message = message_data.get("message", "")
+            attached_files = message_data.get("files", [])
 
-            if not user_message:
+            if not user_message and not attached_files:
                 continue
 
             # Process message and stream response
-            async for chunk in orchestrator.process_message(user_message, conversation_id):
+            async for chunk in orchestrator.process_message(user_message, conversation_id, attached_files):
                 await websocket.send_json(chunk)
 
     except WebSocketDisconnect:

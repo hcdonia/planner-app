@@ -1,5 +1,6 @@
 """AI Orchestrator - manages AI conversations with function calling."""
 import json
+import base64
 from typing import List, Dict, Any, Optional, AsyncGenerator
 from sqlalchemy.orm import Session
 
@@ -7,6 +8,7 @@ from ..ai.client import OpenAIClient
 from ..ai.functions import AI_FUNCTIONS, execute_function
 from .context_builder import ContextBuilder
 from .memory_service import MemoryService
+from .drive_service import get_drive_service
 
 
 class AIOrchestrator:
@@ -18,23 +20,84 @@ class AIOrchestrator:
         self.context_builder = ContextBuilder(db)
         self.memory_service = MemoryService(db)
 
+    async def _build_user_content(
+        self,
+        text: str,
+        files: List[Dict],
+    ) -> Any:
+        """Build user content with text and images for OpenAI Vision API."""
+        if not files:
+            return text
+
+        # Build content array for vision
+        content = []
+
+        # Add text if present
+        if text:
+            content.append({"type": "text", "text": text})
+
+        # Process each file
+        drive_service = get_drive_service()
+
+        for file_info in files:
+            file_id = file_info.get("id")
+            mime_type = file_info.get("mime_type", "")
+
+            try:
+                if mime_type.startswith("image/"):
+                    # Download image and convert to base64 for GPT-4 Vision
+                    file_content, _ = drive_service.download_file(file_id)
+                    b64_content = base64.b64encode(file_content).decode("utf-8")
+
+                    content.append({
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:{mime_type};base64,{b64_content}",
+                            "detail": "auto"
+                        }
+                    })
+
+                elif mime_type == "application/pdf":
+                    # For PDFs, extract text (GPT-4 Vision doesn't support PDFs directly)
+                    # We'll add a text note about the PDF
+                    content.append({
+                        "type": "text",
+                        "text": f"\n[Attached PDF: {file_info.get('name', 'document.pdf')}]\n(Note: I can see this PDF was attached but cannot read its contents directly. Please describe what you'd like me to help with regarding this document.)"
+                    })
+
+            except Exception as e:
+                content.append({
+                    "type": "text",
+                    "text": f"\n[Error loading file {file_info.get('name', 'unknown')}: {str(e)}]"
+                })
+
+        return content if len(content) > 1 else (content[0] if content else text)
+
     async def process_message(
         self,
         user_message: str,
         conversation_id: int,
+        attached_files: List[Dict] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """Process a user message and stream the response."""
-        # Save user message
+        attached_files = attached_files or []
+
+        # Build user content with any attached files
+        user_content = await self._build_user_content(user_message, attached_files)
+
+        # Save user message (store text and file references)
+        metadata = {"files": attached_files} if attached_files else None
         self.memory_service.save_message(
             conversation_id=conversation_id,
             role="user",
             content=user_message,
+            metadata=metadata,
         )
 
         # Build messages for AI
         messages = self.context_builder.build_messages_for_ai(
             conversation_id=conversation_id,
-            user_message=user_message,
+            user_message=user_content,  # Pass content with images
         )
 
         # Track full response for saving
