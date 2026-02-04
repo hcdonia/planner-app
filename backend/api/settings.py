@@ -110,10 +110,17 @@ def get_system_status(db: Session = Depends(get_db)):
 
     settings = get_settings()
     knowledge_service = KnowledgeService(db)
+
+    # Determine database type
+    if settings.DATABASE_URL:
+        db_type = "PostgreSQL"
+    else:
+        db_type = "SQLite local storage"
+
     status = {
         "openai": {"status": "unknown", "model": settings.OPENAI_MODEL},
         "google_calendar": {"status": "unknown"},
-        "database": {"status": "ok"},
+        "database": {"status": "ok", "type": db_type},
         "calendars_configured": 0,
         "knowledge_entries": 0,
     }

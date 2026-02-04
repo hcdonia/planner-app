@@ -341,7 +341,7 @@ function Settings() {
                   {getStatusIcon(systemStatus?.database?.status)}
                   <div>
                     <p className="font-medium text-gray-800">Database</p>
-                    <p className="text-sm text-gray-500">SQLite local storage</p>
+                    <p className="text-sm text-gray-500">{systemStatus?.database?.type || 'Unknown'}</p>
                   </div>
                 </div>
                 <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(systemStatus?.database?.status)}`}>
