@@ -154,53 +154,78 @@ function Todos() {
                 </div>
               ) : (
                 incompleteTodos.map((todo) => (
-                  <div key={todo.id} className="p-4 flex items-center gap-3 group">
+                  <div key={todo.id} className="p-3 sm:p-4 flex items-start sm:items-center gap-3 group">
                     <button
                       onClick={() => handleToggle(todo.id)}
-                      className="w-6 h-6 rounded-full border-2 border-gray-300 hover:border-primary-500 flex items-center justify-center transition-colors"
+                      className="w-6 h-6 mt-0.5 sm:mt-0 flex-shrink-0 rounded-full border-2 border-gray-300 hover:border-primary-500 flex items-center justify-center transition-colors"
                     >
                       <svg className="w-4 h-4 text-gray-300 group-hover:text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
                     </button>
 
-                    {editingId === todo.id ? (
-                      <input
-                        type="text"
-                        value={editText}
-                        onChange={(e) => setEditText(e.target.value)}
-                        onBlur={() => handleSaveEdit(todo.id)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit(todo.id)}
-                        className="flex-1 px-2 py-1 border border-primary-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
-                        autoFocus
-                      />
-                    ) : (
-                      <span
-                        className="flex-1 text-gray-800 cursor-pointer"
-                        onClick={() => handleEdit(todo)}
+                    <div className="flex-1 min-w-0">
+                      {editingId === todo.id ? (
+                        <input
+                          type="text"
+                          value={editText}
+                          onChange={(e) => setEditText(e.target.value)}
+                          onBlur={() => handleSaveEdit(todo.id)}
+                          onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit(todo.id)}
+                          className="w-full px-2 py-1 border border-primary-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+                          autoFocus
+                        />
+                      ) : (
+                        <span
+                          className="block text-gray-800 cursor-pointer break-words"
+                          onClick={() => handleEdit(todo)}
+                        >
+                          {todo.title}
+                        </span>
+                      )}
+
+                      {/* Priority and delete on separate row on mobile */}
+                      <div className="flex items-center gap-2 mt-2 sm:hidden">
+                        <select
+                          value={todo.priority}
+                          onChange={(e) => handlePriorityChange(todo.id, e.target.value)}
+                          className={`px-2 py-1 text-xs font-medium rounded border ${priorityColors[todo.priority]}`}
+                        >
+                          <option value="high">High</option>
+                          <option value="medium">Medium</option>
+                          <option value="low">Low</option>
+                        </select>
+                        <button
+                          onClick={() => handleDelete(todo.id)}
+                          className="text-gray-400 hover:text-red-500 p-1"
+                        >
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Priority and delete inline on desktop */}
+                    <div className="hidden sm:flex items-center gap-2">
+                      <select
+                        value={todo.priority}
+                        onChange={(e) => handlePriorityChange(todo.id, e.target.value)}
+                        className={`px-2 py-1 text-xs font-medium rounded border ${priorityColors[todo.priority]}`}
                       >
-                        {todo.title}
-                      </span>
-                    )}
-
-                    <select
-                      value={todo.priority}
-                      onChange={(e) => handlePriorityChange(todo.id, e.target.value)}
-                      className={`px-2 py-1 text-xs font-medium rounded border ${priorityColors[todo.priority]}`}
-                    >
-                      <option value="high">High</option>
-                      <option value="medium">Medium</option>
-                      <option value="low">Low</option>
-                    </select>
-
-                    <button
-                      onClick={() => handleDelete(todo.id)}
-                      className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-all"
-                    >
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
+                        <option value="high">High</option>
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                      </select>
+                      <button
+                        onClick={() => handleDelete(todo.id)}
+                        className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-all"
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
                 ))
               )}

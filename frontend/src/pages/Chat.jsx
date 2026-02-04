@@ -10,7 +10,8 @@ function Chat() {
   const [conversationId, setConversationId] = useState(null)
   const [conversationTitle, setConversationTitle] = useState(null)
   const [conversations, setConversations] = useState([])
-  const [showCalendar, setShowCalendar] = useState(true)
+  const [showCalendar, setShowCalendar] = useState(false)
+  const [showSidebar, setShowSidebar] = useState(false)
 
   const { createConversation, getConversations, getConversation, deleteConversation } = useApi()
 
@@ -116,32 +117,66 @@ function Chat() {
     }
   }, [conversationId, conversations])
 
-  return (
-    <div className="flex h-screen">
-      <Sidebar
-        conversations={conversations}
-        onNewChat={handleNewChat}
-        onSelectConversation={handleSelectConversation}
-        onDeleteConversation={handleDeleteConversation}
-        currentConversationId={conversationId}
-      />
+  const handleSelectConversationMobile = (id) => {
+    handleSelectConversation(id)
+    setShowSidebar(false)
+  }
 
-      <div className="flex-1 flex flex-col bg-gray-50">
+  const handleNewChatMobile = () => {
+    handleNewChat()
+    setShowSidebar(false)
+  }
+
+  return (
+    <div className="flex h-screen relative">
+      {/* Mobile overlay */}
+      {showSidebar && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+          onClick={() => setShowSidebar(false)}
+        />
+      )}
+
+      {/* Sidebar - hidden on mobile by default */}
+      <div className={`
+        fixed lg:relative inset-y-0 left-0 z-50
+        transform ${showSidebar ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0
+        transition-transform duration-200 ease-in-out
+      `}>
+        <Sidebar
+          conversations={conversations}
+          onNewChat={handleNewChatMobile}
+          onSelectConversation={handleSelectConversationMobile}
+          onDeleteConversation={handleDeleteConversation}
+          currentConversationId={conversationId}
+        />
+      </div>
+
+      <div className="flex-1 flex flex-col bg-gray-50 min-w-0">
         {/* Header */}
         <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <h2 className="font-medium text-gray-800">
-              {conversationTitle || (conversationId ? 'New Chat' : 'New Chat')}
+          <div className="flex items-center gap-3">
+            {/* Hamburger menu for mobile */}
+            <button
+              onClick={() => setShowSidebar(!showSidebar)}
+              className="lg:hidden text-gray-500 hover:text-gray-700"
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+            <h2 className="font-medium text-gray-800 truncate">
+              {conversationTitle || 'New Chat'}
             </h2>
             <span
-              className={`w-2 h-2 rounded-full ${
+              className={`w-2 h-2 rounded-full flex-shrink-0 ${
                 isConnected ? 'bg-green-400' : 'bg-gray-300'
               }`}
             />
           </div>
           <button
             onClick={() => setShowCalendar(!showCalendar)}
-            className="text-gray-500 hover:text-gray-700"
+            className="text-gray-500 hover:text-gray-700 hidden sm:block"
           >
             <svg
               className="w-5 h-5"
@@ -178,8 +213,12 @@ function Chat() {
         />
       </div>
 
-      {/* Calendar Sidebar */}
-      {showCalendar && <CalendarSidebar />}
+      {/* Calendar Sidebar - hidden on mobile */}
+      {showCalendar && (
+        <div className="hidden sm:block">
+          <CalendarSidebar />
+        </div>
+      )}
     </div>
   )
 }
