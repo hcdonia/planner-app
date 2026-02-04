@@ -94,7 +94,7 @@ function Sidebar({ conversations, onNewChat, onSelectConversation, onDeleteConve
       </div>
 
       {/* Navigation */}
-      <div className="p-4 border-t border-gray-700 space-y-2">
+      <div className="p-4 pb-safe border-t border-gray-700 space-y-2">
         <Link
           to="/todos"
           className="flex items-center gap-2 text-gray-300 hover:text-white transition-colors"
