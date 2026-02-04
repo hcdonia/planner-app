@@ -10,6 +10,9 @@ function Todos() {
   const [editingId, setEditingId] = useState(null)
   const [editText, setEditText] = useState('')
   const [editingDateField, setEditingDateField] = useState(null) // {id, field}
+  const [selectedTodo, setSelectedTodo] = useState(null) // For notes modal
+  const [editingNotes, setEditingNotes] = useState(false)
+  const [notesText, setNotesText] = useState('')
 
   const { getTodos, createTodo, updateTodo, deleteTodo, toggleTodo } = useApi()
 
@@ -118,6 +121,31 @@ function Todos() {
     }
   }
 
+  const openNotes = (todo) => {
+    setSelectedTodo(todo)
+    setNotesText(todo.description || '')
+    setEditingNotes(false)
+  }
+
+  const closeNotes = () => {
+    setSelectedTodo(null)
+    setEditingNotes(false)
+    setNotesText('')
+  }
+
+  const handleSaveNotes = async () => {
+    if (!selectedTodo) return
+    try {
+      await updateTodo(selectedTodo.id, { description: notesText })
+      setEditingNotes(false)
+      loadTodos()
+      // Update the selected todo with new description
+      setSelectedTodo({ ...selectedTodo, description: notesText })
+    } catch (err) {
+      alert('Failed to save notes: ' + err.message)
+    }
+  }
+
   const priorityColors = {
     high: 'bg-red-100 text-red-700 border-red-200',
     medium: 'bg-yellow-100 text-yellow-700 border-yellow-200',
@@ -211,12 +239,19 @@ function Todos() {
                             autoFocus
                           />
                         ) : (
-                          <span
-                            className="block text-gray-800 cursor-pointer break-words"
-                            onClick={() => handleEdit(todo)}
-                          >
-                            {todo.title}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="text-gray-800 cursor-pointer break-words hover:text-primary-600"
+                              onClick={() => openNotes(todo)}
+                            >
+                              {todo.title}
+                            </span>
+                            {todo.description && (
+                              <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                              </svg>
+                            )}
+                          </div>
                         )}
                       </div>
                     </div>
@@ -327,6 +362,97 @@ function Todos() {
           </div>
         )}
       </div>
+
+      {/* Notes Modal */}
+      {selectedTodo && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[80vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+              <div className="flex-1 min-w-0">
+                <h3 className="font-medium text-gray-800 truncate">{selectedTodo.title}</h3>
+                <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
+                  {selectedTodo.start_date && (
+                    <span className="text-blue-600">Start: {formatDate(selectedTodo.start_date)}</span>
+                  )}
+                  {selectedTodo.due_date && (
+                    <span className="text-orange-600">Due: {formatDate(selectedTodo.due_date)}</span>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={closeNotes}
+                className="text-gray-400 hover:text-gray-600 p-1"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 p-4 overflow-y-auto">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-gray-600">Notes</span>
+                {!editingNotes && (
+                  <button
+                    onClick={() => setEditingNotes(true)}
+                    className="text-xs text-primary-600 hover:text-primary-700"
+                  >
+                    Edit
+                  </button>
+                )}
+              </div>
+
+              {editingNotes ? (
+                <textarea
+                  value={notesText}
+                  onChange={(e) => setNotesText(e.target.value)}
+                  placeholder="Add notes about this task..."
+                  className="w-full h-48 px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
+                  autoFocus
+                />
+              ) : (
+                <div className="min-h-[120px] p-3 bg-gray-50 rounded-lg text-gray-700 whitespace-pre-wrap">
+                  {selectedTodo.description || (
+                    <span className="text-gray-400 italic">No notes yet. Click Edit to add notes.</span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-4 py-3 border-t border-gray-200 flex justify-end gap-2">
+              {editingNotes ? (
+                <>
+                  <button
+                    onClick={() => {
+                      setEditingNotes(false)
+                      setNotesText(selectedTodo.description || '')
+                    }}
+                    className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSaveNotes}
+                    className="px-4 py-2 text-sm bg-primary-500 text-white rounded-lg hover:bg-primary-600"
+                  >
+                    Save Notes
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={closeNotes}
+                  className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                >
+                  Close
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
