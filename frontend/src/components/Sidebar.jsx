@@ -6,7 +6,7 @@ function Sidebar({ conversations, onNewChat, onSelectConversation, onDeleteConve
   const isSettings = location.pathname === '/settings'
 
   return (
-    <div className="w-64 bg-gray-900 text-white flex flex-col h-screen">
+    <div className="w-64 bg-gray-900 text-white flex flex-col h-full min-h-screen">
       {/* Header */}
       <div className="p-4 border-b border-gray-700">
         <h1 className="text-lg font-semibold flex items-center gap-2">
