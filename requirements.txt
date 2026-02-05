@@ -18,6 +18,7 @@ google-auth-oauthlib
 # Utilities
 python-dotenv
 python-multipart
+PyPDF2
 pydantic>=2.0.0
 pydantic-settings>=2.0.0
 requests

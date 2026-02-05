@@ -1,4 +1,5 @@
 """AI Orchestrator - manages AI conversations with function calling."""
+import io
 import json
 import base64
 from typing import List, Dict, Any, Optional, AsyncGenerator
@@ -58,12 +59,21 @@ class AIOrchestrator:
                     })
 
                 elif mime_type == "application/pdf":
-                    # For PDFs, extract text (GPT-4 Vision doesn't support PDFs directly)
-                    # We'll add a text note about the PDF
-                    content.append({
-                        "type": "text",
-                        "text": f"\n[Attached PDF: {file_info.get('name', 'document.pdf')}]\n(Note: I can see this PDF was attached but cannot read its contents directly. Please describe what you'd like me to help with regarding this document.)"
-                    })
+                    # Download PDF and extract text
+                    file_content, _ = drive_service.download_file(file_id)
+                    pdf_text = self._extract_pdf_text(file_content)
+                    filename = file_info.get('name', 'document.pdf')
+
+                    if pdf_text.strip():
+                        content.append({
+                            "type": "text",
+                            "text": f"\n[Attached PDF: {filename}]\nContents:\n{pdf_text}"
+                        })
+                    else:
+                        content.append({
+                            "type": "text",
+                            "text": f"\n[Attached PDF: {filename}]\n(Could not extract text - the PDF may be image-based or empty.)"
+                        })
 
             except Exception as e:
                 content.append({
@@ -72,6 +82,20 @@ class AIOrchestrator:
                 })
 
         return content if len(content) > 1 else (content[0] if content else text)
+
+    def _extract_pdf_text(self, pdf_bytes: bytes) -> str:
+        """Extract text content from a PDF file."""
+        try:
+            from PyPDF2 import PdfReader
+            reader = PdfReader(io.BytesIO(pdf_bytes))
+            text_parts = []
+            for page in reader.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    text_parts.append(page_text)
+            return "\n".join(text_parts)
+        except Exception as e:
+            return f"(Error extracting PDF text: {str(e)})"
 
     async def process_message(
         self,
