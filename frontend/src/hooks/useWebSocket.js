@@ -38,6 +38,7 @@ export function useWebSocket(conversationId, onTitleUpdate) {
           break
 
         case 'function_call':
+          setIsTyping(true)
           // Show function call in UI
           setMessages((prev) => [
             ...prev,
@@ -138,6 +139,9 @@ export function useWebSocket(conversationId, onTitleUpdate) {
         files: files
       }
       setMessages((prev) => [...prev, userMessage])
+
+      // Show thinking indicator immediately
+      setIsTyping(true)
 
       // Send to WebSocket
       wsRef.current.send(JSON.stringify({

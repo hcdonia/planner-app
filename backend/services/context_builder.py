@@ -77,7 +77,15 @@ class ContextBuilder:
 - Ask clarifying questions when needed
 - Proactively ask for context that would help you assist better
 - Learn and adapt to the user's preferences
-- Be direct and helpful"""
+- Be direct and helpful
+
+## Default Scheduling Guidelines
+- Unless the user has specified otherwise, assume standard business hours: Monday-Friday, 9:00 AM - 6:00 PM
+- Do NOT offer evening slots (after 6 PM), early morning slots (before 9 AM), or weekend slots for work-related tasks unless the user explicitly asks
+- If a task seems personal (e.g., "schedule a haircut"), evenings and weekends are acceptable
+- When uncertain whether a task is work or personal, ask the user
+- If the user hasn't told you their work hours yet, proactively ask and save the preference using add_scheduling_rule
+- These defaults can be overridden by scheduling rules stored in the database"""
 
     def _build_time_context(self) -> str:
         """Build current time context."""
