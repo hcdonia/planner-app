@@ -530,11 +530,11 @@ def execute_function(
             for day in sorted(slot_dates):
                 day_events = calendar_service.get_day_schedule(day)
                 if day_events:
-                    existing_events[day.isoformat()] = [
+                    day_label = day.strftime("%A, %B %d")
+                    existing_events[day_label] = [
                         {
                             "title": e["summary"],
-                            "start": e["start"].isoformat() if isinstance(e["start"], dt.datetime) else e["start"],
-                            "end": e["end"].isoformat() if isinstance(e["end"], dt.datetime) else e["end"],
+                            "time": f"{e['start'].strftime('%I:%M %p') if isinstance(e['start'], dt.datetime) else e['start']} - {e['end'].strftime('%I:%M %p') if isinstance(e['end'], dt.datetime) else e['end']}",
                         }
                         for e in day_events
                     ]
@@ -542,8 +542,8 @@ def execute_function(
             return {
                 "success": True,
                 "available_slots": formatted_slots,
-                "existing_events": existing_events,
-                "message": f"Found {len(formatted_slots)} available slots. IMPORTANT: Only reference events listed in 'existing_events' - do not fabricate or assume any calendar events.",
+                "existing_events_by_day": existing_events,
+                "message": f"Found {len(formatted_slots)} available slots. IMPORTANT: The 'available_slots' are guaranteed free times with no conflicts. The 'existing_events_by_day' shows what is ALREADY scheduled. Do NOT suggest times that overlap with existing events. Only offer the exact times listed in 'available_slots'.",
             }
 
         elif function_name == "schedule_task":
