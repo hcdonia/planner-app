@@ -1,8 +1,8 @@
-"""OpenAI client wrapper."""
+"""Anthropic Claude client wrapper."""
 import json
 import logging
 from typing import List, Dict, Any, Optional, AsyncGenerator
-from openai import OpenAI, AsyncOpenAI, RateLimitError, APIError, AuthenticationError
+from anthropic import Anthropic, AsyncAnthropic, RateLimitError, APIError, AuthenticationError
 
 from ..config import get_settings
 
@@ -13,221 +13,189 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
-class OpenAIClient:
-    """Wrapper for OpenAI API calls."""
+class AIClient:
+    """Wrapper for Anthropic Claude API calls."""
 
     def __init__(self):
-        self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
-        self.async_client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
-        self.model = settings.OPENAI_MODEL
+        self.client = Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+        self.async_client = AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+        self.model = settings.AI_MODEL
 
     def chat(
         self,
-        messages: List[Dict[str, str]],
-        functions: Optional[List[Dict]] = None,
-        stream: bool = False,
+        messages: List[Dict[str, Any]],
+        tools: Optional[List[Dict]] = None,
     ) -> Dict[str, Any]:
-        """Make a chat completion request."""
+        """Make a chat completion request (non-streaming)."""
+        system_prompt, chat_messages = self._extract_system(messages)
+
         kwargs = {
             "model": self.model,
-            "messages": messages,
+            "max_tokens": 4096,
+            "messages": chat_messages,
         }
 
-        if functions:
-            kwargs["tools"] = functions
-            kwargs["tool_choice"] = "auto"
+        if system_prompt:
+            kwargs["system"] = system_prompt
 
-        if stream:
-            kwargs["stream"] = True
-            return self.client.chat.completions.create(**kwargs)
+        if tools:
+            kwargs["tools"] = tools
+            kwargs["tool_choice"] = {"type": "auto"}
 
-        response = self.client.chat.completions.create(**kwargs)
-        return self._parse_response(response)
-
-    async def chat_async(
-        self,
-        messages: List[Dict[str, str]],
-        functions: Optional[List[Dict]] = None,
-        stream: bool = False,
-    ):
-        """Make an async chat completion request."""
-        kwargs = {
-            "model": self.model,
-            "messages": messages,
-        }
-
-        if functions:
-            kwargs["tools"] = functions
-            kwargs["tool_choice"] = "auto"
-
-        if stream:
-            kwargs["stream"] = True
-            return await self.async_client.chat.completions.create(**kwargs)
-
-        response = await self.async_client.chat.completions.create(**kwargs)
+        response = self.client.messages.create(**kwargs)
         return self._parse_response(response)
 
     async def stream_chat(
         self,
-        messages: List[Dict[str, str]],
-        functions: Optional[List[Dict]] = None,
+        messages: List[Dict[str, Any]],
+        tools: Optional[List[Dict]] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """Stream chat completion responses."""
+        system_prompt, chat_messages = self._extract_system(messages)
+
         kwargs = {
             "model": self.model,
-            "messages": messages,
-            "stream": True,
+            "max_tokens": 4096,
+            "messages": chat_messages,
         }
 
-        if functions:
-            kwargs["tools"] = functions
-            kwargs["tool_choice"] = "auto"
+        if system_prompt:
+            kwargs["system"] = system_prompt
+
+        if tools:
+            kwargs["tools"] = tools
+            kwargs["tool_choice"] = {"type": "auto"}
 
         try:
-            stream = await self.async_client.chat.completions.create(**kwargs)
+            async with self.async_client.messages.stream(**kwargs) as stream:
+                collected_content = ""
+                current_tool_id = None
+                current_tool_name = None
+                current_tool_input = ""
+
+                async for event in stream:
+                    if event.type == "content_block_start":
+                        block = event.content_block
+                        if block.type == "tool_use":
+                            current_tool_id = block.id
+                            current_tool_name = block.name
+                            current_tool_input = ""
+
+                    elif event.type == "content_block_delta":
+                        delta = event.delta
+                        if delta.type == "text_delta":
+                            collected_content += delta.text
+                            yield {
+                                "type": "content",
+                                "content": delta.text,
+                            }
+                        elif delta.type == "input_json_delta":
+                            current_tool_input += delta.partial_json
+
+                    elif event.type == "content_block_stop":
+                        if current_tool_id and current_tool_name:
+                            try:
+                                parsed_input = json.loads(current_tool_input) if current_tool_input else {}
+                            except json.JSONDecodeError:
+                                parsed_input = {}
+
+                            yield {
+                                "type": "tool_call",
+                                "tool_call": {
+                                    "id": current_tool_id,
+                                    "name": current_tool_name,
+                                    "arguments": parsed_input,
+                                },
+                            }
+
+                            current_tool_id = None
+                            current_tool_name = None
+                            current_tool_input = ""
+
+                # Get the final message to check stop reason
+                final_message = await stream.get_final_message()
+                stop_reason = final_message.stop_reason
+
+                yield {
+                    "type": "finish",
+                    "finish_reason": "tool_calls" if stop_reason == "tool_use" else "stop",
+                    "full_content": collected_content,
+                }
+
         except RateLimitError as e:
             logger.error(f"Rate limit exceeded: {e}")
             yield {
                 "type": "error",
                 "error_type": "rate_limit",
-                "message": "OpenAI rate limit exceeded. Please wait a moment and try again. If this persists, check your API usage at platform.openai.com/usage",
+                "message": "Claude rate limit exceeded. Please wait a moment and try again.",
             }
-            return
         except AuthenticationError as e:
             logger.error(f"Authentication error: {e}")
             yield {
                 "type": "error",
                 "error_type": "auth_error",
-                "message": "OpenAI API key is invalid or expired. Please check your OPENAI_API_KEY in the .env file.",
+                "message": "Anthropic API key is invalid or expired. Please check your ANTHROPIC_API_KEY.",
             }
-            return
         except APIError as e:
-            logger.error(f"OpenAI API error: {e}")
+            logger.error(f"Anthropic API error: {e}")
             yield {
                 "type": "error",
                 "error_type": "api_error",
-                "message": f"OpenAI API error: {str(e)}",
+                "message": f"Claude API error: {str(e)}",
             }
-            return
         except Exception as e:
-            logger.error(f"Unexpected error calling OpenAI: {e}")
+            logger.error(f"Unexpected error calling Claude: {e}")
             yield {
                 "type": "error",
                 "error_type": "unknown",
                 "message": f"Unexpected error: {str(e)}",
             }
-            return
 
-        collected_content = ""
-        collected_tool_calls = []
-
-        try:
-            async for chunk in stream:
-                delta = chunk.choices[0].delta
-
-                # Handle content
-                if delta.content:
-                    collected_content += delta.content
-                    yield {
-                        "type": "content",
-                        "content": delta.content,
-                    }
-
-                # Handle tool calls
-                if delta.tool_calls:
-                    for tool_call in delta.tool_calls:
-                        if tool_call.index is not None:
-                            # New or continuing tool call
-                            while len(collected_tool_calls) <= tool_call.index:
-                                collected_tool_calls.append({
-                                    "id": "",
-                                    "name": "",
-                                    "arguments": "",
-                                })
-
-                            tc = collected_tool_calls[tool_call.index]
-
-                            if tool_call.id:
-                                tc["id"] = tool_call.id
-                            if tool_call.function:
-                                if tool_call.function.name:
-                                    tc["name"] = tool_call.function.name
-                                if tool_call.function.arguments:
-                                    tc["arguments"] += tool_call.function.arguments
-
-                # Check for finish
-                if chunk.choices[0].finish_reason:
-                    if chunk.choices[0].finish_reason == "tool_calls":
-                        for tc in collected_tool_calls:
-                            yield {
-                                "type": "tool_call",
-                                "tool_call": {
-                                    "id": tc["id"],
-                                    "name": tc["name"],
-                                    "arguments": json.loads(tc["arguments"]) if tc["arguments"] else {},
-                                },
-                            }
-                    yield {
-                        "type": "finish",
-                        "finish_reason": chunk.choices[0].finish_reason,
-                        "full_content": collected_content,
-                    }
-        except Exception as e:
-            logger.error(f"Error during streaming: {e}")
-            yield {
-                "type": "error",
-                "error_type": "stream_error",
-                "message": f"Error during response: {str(e)}",
-            }
+    def _extract_system(self, messages: List[Dict]) -> tuple:
+        """Extract system message and return (system_prompt, chat_messages)."""
+        system_prompt = ""
+        chat_messages = []
+        for msg in messages:
+            if msg["role"] == "system":
+                system_prompt = msg["content"]
+            else:
+                chat_messages.append(msg)
+        return system_prompt, chat_messages
 
     def _parse_response(self, response) -> Dict[str, Any]:
-        """Parse OpenAI response into a standard format."""
-        message = response.choices[0].message
-
+        """Parse Anthropic response into a standard format."""
         result = {
-            "content": message.content,
-            "role": message.role,
-            "finish_reason": response.choices[0].finish_reason,
+            "content": "",
+            "role": "assistant",
+            "finish_reason": response.stop_reason,
         }
 
-        if message.tool_calls:
-            result["tool_calls"] = [
-                {
-                    "id": tc.id,
-                    "name": tc.function.name,
-                    "arguments": json.loads(tc.function.arguments),
-                }
-                for tc in message.tool_calls
-            ]
+        tool_calls = []
+        for block in response.content:
+            if block.type == "text":
+                result["content"] = (result["content"] or "") + block.text
+            elif block.type == "tool_use":
+                tool_calls.append({
+                    "id": block.id,
+                    "name": block.name,
+                    "arguments": block.input,
+                })
+
+        if tool_calls:
+            result["tool_calls"] = tool_calls
 
         return result
 
-    def create_tool_response(
-        self,
-        tool_call_id: str,
-        content: str,
-    ) -> Dict[str, str]:
-        """Create a tool response message."""
-        return {
-            "role": "tool",
-            "tool_call_id": tool_call_id,
-            "content": content,
-        }
-
     def generate_conversation_title(self, user_message: str, ai_response: str) -> str:
         """Generate a short title for a conversation based on the first exchange."""
-        response = self.client.chat.completions.create(
-            model="gpt-4o-mini",  # Use faster/cheaper model for titles
+        response = self.client.messages.create(
+            model="claude-haiku-4-5",
+            max_tokens=20,
             messages=[
                 {
-                    "role": "system",
-                    "content": "Generate a very short title (2-5 words) for this conversation. Focus on the main topic or task. No quotes, no punctuation. Just the title.",
-                },
-                {
                     "role": "user",
-                    "content": f"User said: {user_message[:200]}\n\nAssistant responded about: {ai_response[:200]}",
+                    "content": f"Generate a very short title (2-5 words) for this conversation. Focus on the main topic or task. No quotes, no punctuation. Just the title.\n\nUser said: {user_message[:200]}\n\nAssistant responded about: {ai_response[:200]}",
                 },
             ],
-            max_tokens=20,
         )
-        return response.choices[0].message.content.strip()
+        return response.content[0].text.strip()

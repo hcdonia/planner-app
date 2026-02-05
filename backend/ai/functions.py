@@ -1,4 +1,4 @@
-"""AI function definitions for GPT function calling."""
+"""AI function definitions for Claude tool calling."""
 import datetime as dt
 from typing import Any, Dict, Optional
 from zoneinfo import ZoneInfo
@@ -13,388 +13,336 @@ from ..models.database import TodoItem
 settings = get_settings()
 
 
-# Function definitions for OpenAI
+# Tool definitions for Anthropic Claude
 AI_FUNCTIONS = [
     # ============ Calendar Operations ============
     {
-        "type": "function",
-        "function": {
-            "name": "check_availability",
-            "description": "Check calendar availability for scheduling. Returns available time slots.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "duration_minutes": {
-                        "type": "integer",
-                        "description": "Duration of the event in minutes",
-                    },
-                    "date_preference": {
-                        "type": "string",
-                        "description": "Preferred date or date range (e.g., 'tomorrow', 'next week', 'Monday')",
-                    },
-                    "time_preference": {
-                        "type": "string",
-                        "description": "Preferred time of day (e.g., 'morning', 'afternoon', '2pm')",
-                    },
-                    "allow_outside_hours": {
-                        "type": "boolean",
-                        "description": "Whether to include times outside normal work hours",
-                        "default": False,
-                    },
+        "name": "check_availability",
+        "description": "Check calendar availability for scheduling. Returns available time slots that are guaranteed to have no conflicts. Always use the exact slots returned - never suggest your own times.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "duration_minutes": {
+                    "type": "integer",
+                    "description": "Duration of the event in minutes",
                 },
-                "required": ["duration_minutes"],
+                "date_preference": {
+                    "type": "string",
+                    "description": "Preferred date or date range (e.g., 'tomorrow', 'next week', 'Monday')",
+                },
+                "time_preference": {
+                    "type": "string",
+                    "description": "Preferred time of day (e.g., 'morning', 'afternoon', '2pm')",
+                },
+                "allow_outside_hours": {
+                    "type": "boolean",
+                    "description": "Whether to include times outside normal work hours",
+                },
             },
+            "required": ["duration_minutes"],
         },
     },
     {
-        "type": "function",
-        "function": {
-            "name": "schedule_task",
-            "description": "Schedule a task on the calendar. Always confirm with user before calling.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "title": {
-                        "type": "string",
-                        "description": "Title of the event",
-                    },
-                    "start_time": {
-                        "type": "string",
-                        "description": "Start time in ISO format (e.g., '2024-01-15T14:00:00')",
-                    },
-                    "duration_minutes": {
-                        "type": "integer",
-                        "description": "Duration in minutes",
-                    },
-                    "description": {
-                        "type": "string",
-                        "description": "Optional description for the event",
-                    },
+        "name": "schedule_task",
+        "description": "Schedule a task on the calendar. Always confirm with user before calling.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "title": {
+                    "type": "string",
+                    "description": "Title of the event",
                 },
-                "required": ["title", "start_time", "duration_minutes"],
+                "start_time": {
+                    "type": "string",
+                    "description": "Start time in ISO format (e.g., '2024-01-15T14:00:00')",
+                },
+                "duration_minutes": {
+                    "type": "integer",
+                    "description": "Duration in minutes",
+                },
+                "description": {
+                    "type": "string",
+                    "description": "Optional description for the event",
+                },
             },
+            "required": ["title", "start_time", "duration_minutes"],
         },
     },
     {
-        "type": "function",
-        "function": {
-            "name": "get_day_schedule",
-            "description": "Get all events scheduled for a specific day",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "date": {
-                        "type": "string",
-                        "description": "Date in YYYY-MM-DD format, or 'today', 'tomorrow'",
-                    },
+        "name": "get_day_schedule",
+        "description": "Get all events scheduled for a specific day",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "date": {
+                    "type": "string",
+                    "description": "Date in YYYY-MM-DD format, or 'today', 'tomorrow'",
                 },
-                "required": ["date"],
             },
+            "required": ["date"],
         },
     },
     {
-        "type": "function",
-        "function": {
-            "name": "get_week_overview",
-            "description": "Get an overview of the week's schedule",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "start_date": {
-                        "type": "string",
-                        "description": "Start date in YYYY-MM-DD format (defaults to today)",
-                    },
+        "name": "get_week_overview",
+        "description": "Get an overview of the week's schedule",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "start_date": {
+                    "type": "string",
+                    "description": "Start date in YYYY-MM-DD format (defaults to today)",
                 },
-                "required": [],
             },
+            "required": [],
         },
     },
     # ============ Knowledge Management ============
     {
-        "type": "function",
-        "function": {
-            "name": "save_knowledge",
-            "description": "Save important information about the user for future reference",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "category": {
-                        "type": "string",
-                        "enum": ["business", "people", "preferences", "task_types", "general"],
-                        "description": "Category of the knowledge",
-                    },
-                    "subject": {
-                        "type": "string",
-                        "description": "What this knowledge is about (e.g., 'Modern Stylist Movement', 'Sarah')",
-                    },
-                    "content": {
-                        "type": "string",
-                        "description": "The actual information to remember",
-                    },
+        "name": "save_knowledge",
+        "description": "Save important information about the user for future reference",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "category": {
+                    "type": "string",
+                    "enum": ["business", "people", "preferences", "task_types", "general"],
+                    "description": "Category of the knowledge",
                 },
-                "required": ["category", "subject", "content"],
+                "subject": {
+                    "type": "string",
+                    "description": "What this knowledge is about (e.g., 'Modern Stylist Movement', 'Sarah')",
+                },
+                "content": {
+                    "type": "string",
+                    "description": "The actual information to remember",
+                },
             },
+            "required": ["category", "subject", "content"],
         },
     },
     {
-        "type": "function",
-        "function": {
-            "name": "get_knowledge",
-            "description": "Search for stored knowledge about a topic",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "What to search for",
-                    },
+        "name": "get_knowledge",
+        "description": "Search for stored knowledge about a topic",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "What to search for",
                 },
-                "required": ["query"],
             },
+            "required": ["query"],
         },
     },
     {
-        "type": "function",
-        "function": {
-            "name": "update_knowledge",
-            "description": "Update existing knowledge entry",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "knowledge_id": {
-                        "type": "integer",
-                        "description": "ID of the knowledge entry to update",
-                    },
-                    "content": {
-                        "type": "string",
-                        "description": "New content for the knowledge entry",
-                    },
+        "name": "update_knowledge",
+        "description": "Update existing knowledge entry",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "knowledge_id": {
+                    "type": "integer",
+                    "description": "ID of the knowledge entry to update",
                 },
-                "required": ["knowledge_id", "content"],
+                "content": {
+                    "type": "string",
+                    "description": "New content for the knowledge entry",
+                },
             },
+            "required": ["knowledge_id", "content"],
         },
     },
     # ============ Self-Modification ============
     {
-        "type": "function",
-        "function": {
-            "name": "add_instruction",
-            "description": "Add a new instruction for how to behave. Use when user tells you to change behavior.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "category": {
-                        "type": "string",
-                        "enum": ["scheduling", "communication", "preferences", "behavior"],
-                        "description": "Category of the instruction",
-                    },
-                    "instruction": {
-                        "type": "string",
-                        "description": "The instruction to follow",
-                    },
+        "name": "add_instruction",
+        "description": "Add a new instruction for how to behave. Use when user tells you to change behavior.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "category": {
+                    "type": "string",
+                    "enum": ["scheduling", "communication", "preferences", "behavior"],
+                    "description": "Category of the instruction",
                 },
-                "required": ["category", "instruction"],
+                "instruction": {
+                    "type": "string",
+                    "description": "The instruction to follow",
+                },
             },
+            "required": ["category", "instruction"],
         },
     },
     {
-        "type": "function",
-        "function": {
-            "name": "add_scheduling_rule",
-            "description": "Add a scheduling constraint or preference",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "rule_type": {
-                        "type": "string",
-                        "enum": ["time_block", "buffer", "preference", "constraint"],
-                        "description": "Type of scheduling rule",
-                    },
-                    "name": {
-                        "type": "string",
-                        "description": "Name of the rule (e.g., 'No meetings before 10am')",
-                    },
-                    "config": {
-                        "type": "object",
-                        "description": "Rule configuration (e.g., {earliest_hour: 10})",
-                    },
+        "name": "add_scheduling_rule",
+        "description": "Add a scheduling constraint or preference",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "rule_type": {
+                    "type": "string",
+                    "enum": ["time_block", "buffer", "preference", "constraint"],
+                    "description": "Type of scheduling rule",
                 },
-                "required": ["rule_type", "name", "config"],
+                "name": {
+                    "type": "string",
+                    "description": "Name of the rule (e.g., 'No meetings before 10am')",
+                },
+                "config": {
+                    "type": "object",
+                    "description": "Rule configuration (e.g., {earliest_hour: 10})",
+                },
             },
+            "required": ["rule_type", "name", "config"],
         },
     },
     # ============ Calendar Configuration ============
     {
-        "type": "function",
-        "function": {
-            "name": "add_calendar",
-            "description": "Add a new Google Calendar to track",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "name": {
-                        "type": "string",
-                        "description": "Display name for the calendar",
-                    },
-                    "google_calendar_id": {
-                        "type": "string",
-                        "description": "Google Calendar ID (email format or calendar ID)",
-                    },
-                    "permission": {
-                        "type": "string",
-                        "enum": ["read", "read_write"],
-                        "description": "Permission level",
-                        "default": "read",
-                    },
+        "name": "add_calendar",
+        "description": "Add a new Google Calendar to track",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "Display name for the calendar",
                 },
-                "required": ["name", "google_calendar_id"],
+                "google_calendar_id": {
+                    "type": "string",
+                    "description": "Google Calendar ID (email format or calendar ID)",
+                },
+                "permission": {
+                    "type": "string",
+                    "enum": ["read", "read_write"],
+                    "description": "Permission level",
+                },
             },
+            "required": ["name", "google_calendar_id"],
         },
     },
     {
-        "type": "function",
-        "function": {
-            "name": "list_google_calendars",
-            "description": "List all available Google Calendars from the user's account",
-            "parameters": {
-                "type": "object",
-                "properties": {},
-                "required": [],
-            },
+        "name": "list_google_calendars",
+        "description": "List all available Google Calendars from the user's account",
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": [],
         },
     },
     {
-        "type": "function",
-        "function": {
-            "name": "remove_calendar",
-            "description": "Stop tracking a calendar",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "calendar_id": {
-                        "type": "integer",
-                        "description": "Database ID of the calendar to remove",
-                    },
+        "name": "remove_calendar",
+        "description": "Stop tracking a calendar",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "calendar_id": {
+                    "type": "integer",
+                    "description": "Database ID of the calendar to remove",
                 },
-                "required": ["calendar_id"],
             },
+            "required": ["calendar_id"],
         },
     },
     # ============ Todo List Operations ============
     {
-        "type": "function",
-        "function": {
-            "name": "add_todo",
-            "description": "Add a new task to the to-do list",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "title": {
-                        "type": "string",
-                        "description": "Title of the task",
-                    },
-                    "description": {
-                        "type": "string",
-                        "description": "Optional description or notes for the task",
-                    },
-                    "priority": {
-                        "type": "string",
-                        "enum": ["high", "medium", "low"],
-                        "description": "Priority level of the task",
-                        "default": "medium",
-                    },
-                    "start_date": {
-                        "type": "string",
-                        "description": "When to start working on the task (ISO format or natural language like 'tomorrow', 'next Monday')",
-                    },
-                    "due_date": {
-                        "type": "string",
-                        "description": "Deadline for the task (ISO format or natural language)",
-                    },
-                    "estimated_minutes": {
-                        "type": "integer",
-                        "description": "Estimated time to complete in minutes",
-                    },
+        "name": "add_todo",
+        "description": "Add a new task to the to-do list",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "title": {
+                    "type": "string",
+                    "description": "Title of the task",
                 },
-                "required": ["title"],
+                "description": {
+                    "type": "string",
+                    "description": "Optional description or notes for the task",
+                },
+                "priority": {
+                    "type": "string",
+                    "enum": ["high", "medium", "low"],
+                    "description": "Priority level of the task",
+                },
+                "start_date": {
+                    "type": "string",
+                    "description": "When to start working on the task (ISO format or natural language like 'tomorrow', 'next Monday')",
+                },
+                "due_date": {
+                    "type": "string",
+                    "description": "Deadline for the task (ISO format or natural language)",
+                },
+                "estimated_minutes": {
+                    "type": "integer",
+                    "description": "Estimated time to complete in minutes",
+                },
             },
+            "required": ["title"],
         },
     },
     {
-        "type": "function",
-        "function": {
-            "name": "get_todos",
-            "description": "Get all tasks from the to-do list",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "include_completed": {
-                        "type": "boolean",
-                        "description": "Whether to include completed tasks",
-                        "default": False,
-                    },
+        "name": "get_todos",
+        "description": "Get all tasks from the to-do list",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "include_completed": {
+                    "type": "boolean",
+                    "description": "Whether to include completed tasks",
                 },
-                "required": [],
             },
+            "required": [],
         },
     },
     {
-        "type": "function",
-        "function": {
-            "name": "update_todo",
-            "description": "Update an existing to-do item",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "todo_id": {
-                        "type": "integer",
-                        "description": "ID of the todo to update",
-                    },
-                    "title": {
-                        "type": "string",
-                        "description": "New title",
-                    },
-                    "description": {
-                        "type": "string",
-                        "description": "New description",
-                    },
-                    "priority": {
-                        "type": "string",
-                        "enum": ["high", "medium", "low"],
-                        "description": "New priority",
-                    },
-                    "start_date": {
-                        "type": "string",
-                        "description": "New start date",
-                    },
-                    "due_date": {
-                        "type": "string",
-                        "description": "New due date",
-                    },
-                    "completed": {
-                        "type": "boolean",
-                        "description": "Mark as completed or incomplete",
-                    },
+        "name": "update_todo",
+        "description": "Update an existing to-do item",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "todo_id": {
+                    "type": "integer",
+                    "description": "ID of the todo to update",
                 },
-                "required": ["todo_id"],
+                "title": {
+                    "type": "string",
+                    "description": "New title",
+                },
+                "description": {
+                    "type": "string",
+                    "description": "New description",
+                },
+                "priority": {
+                    "type": "string",
+                    "enum": ["high", "medium", "low"],
+                    "description": "New priority",
+                },
+                "start_date": {
+                    "type": "string",
+                    "description": "New start date",
+                },
+                "due_date": {
+                    "type": "string",
+                    "description": "New due date",
+                },
+                "completed": {
+                    "type": "boolean",
+                    "description": "Mark as completed or incomplete",
+                },
             },
+            "required": ["todo_id"],
         },
     },
     {
-        "type": "function",
-        "function": {
-            "name": "delete_todo",
-            "description": "Delete a to-do item",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "todo_id": {
-                        "type": "integer",
-                        "description": "ID of the todo to delete",
-                    },
+        "name": "delete_todo",
+        "description": "Delete a to-do item",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "todo_id": {
+                    "type": "integer",
+                    "description": "ID of the todo to delete",
                 },
-                "required": ["todo_id"],
             },
+            "required": ["todo_id"],
         },
     },
 ]

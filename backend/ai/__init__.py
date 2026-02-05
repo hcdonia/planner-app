@@ -1,6 +1,5 @@
 """AI package."""
-from .client import OpenAIClient
+from .client import AIClient
 from .functions import AI_FUNCTIONS, execute_function
-from .prompts import BASE_SYSTEM_PROMPT
 
-__all__ = ["OpenAIClient", "AI_FUNCTIONS", "execute_function", "BASE_SYSTEM_PROMPT"]
+__all__ = ["AIClient", "AI_FUNCTIONS", "execute_function"]

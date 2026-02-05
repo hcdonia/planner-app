@@ -20,10 +20,11 @@ class Settings(BaseSettings):
     DATABASE_URL: Optional[str] = None
 
     # API Keys
-    OPENAI_API_KEY: str = ""
+    ANTHROPIC_API_KEY: str = ""
+    OPENAI_API_KEY: str = ""  # Keep for legacy/fallback
 
-    # OpenAI Configuration
-    OPENAI_MODEL: str = "gpt-4o"
+    # AI Model Configuration
+    AI_MODEL: str = "claude-opus-4-6"
 
     # Google Calendar & Drive - support base64 encoded credentials for cloud deployment
     GOOGLE_SCOPES: list = [

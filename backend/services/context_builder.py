@@ -88,14 +88,22 @@ class ContextBuilder:
 - These defaults can be overridden by scheduling rules stored in the database"""
 
     def _build_time_context(self) -> str:
-        """Build current time context."""
+        """Build current time context with date awareness."""
         tz = ZoneInfo(settings.TIMEZONE)
         now = dt.datetime.now(tz)
 
-        return f"""## Current Context
-- Current time: {now.strftime("%I:%M %p")}
-- Today: {now.strftime("%A, %B %d, %Y")}
-- Timezone: {settings.TIMEZONE}"""
+        # Calculate useful date references
+        tomorrow = now + dt.timedelta(days=1)
+        end_of_week = now + dt.timedelta(days=(4 - now.weekday()) if now.weekday() <= 4 else (11 - now.weekday()))
+
+        return f"""## Current Date & Time (CRITICAL - use these exact values)
+- RIGHT NOW: {now.strftime("%I:%M %p")} on {now.strftime("%A, %B %d, %Y")}
+- Today is: {now.strftime("%A")} ({now.strftime("%Y-%m-%d")})
+- Tomorrow is: {tomorrow.strftime("%A, %B %d")} ({tomorrow.strftime("%Y-%m-%d")})
+- End of this work week: {end_of_week.strftime("%A, %B %d")} ({end_of_week.strftime("%Y-%m-%d")})
+- Timezone: {settings.TIMEZONE}
+
+IMPORTANT: When working with dates, always verify your math. If the user says "this week" or "by end of week", that means by {end_of_week.strftime("%A, %B %d")}. Today is {now.strftime("%A")} - count days carefully."""
 
     def _build_instructions_context(self) -> str:
         """Build instructions section from database."""
@@ -208,7 +216,14 @@ No calendars configured yet. Ask the user which calendars they want to track."""
 2. Save important context using save_knowledge
 3. When the user gives you instructions about behavior, save them with add_instruction
 4. Ask for clarification when the user's request is ambiguous
-5. Proactively ask for context that would help you assist better"""
+5. Proactively ask for context that would help you assist better
+
+### Date & Time Accuracy (CRITICAL)
+- Before presenting any dates or times to the user, DOUBLE CHECK your work
+- When check_availability returns slots, ONLY present those exact slots - never make up your own
+- When referencing existing events, ONLY use data from the tool results - never fabricate event names or times
+- Verify that the day of the week matches the date (e.g., February 5, 2026 is a Thursday)
+- If you're unsure about a date, use get_day_schedule to verify before responding"""
 
     def build_messages_for_ai(
         self,

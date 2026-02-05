@@ -5,7 +5,7 @@ import base64
 from typing import List, Dict, Any, Optional, AsyncGenerator
 from sqlalchemy.orm import Session
 
-from ..ai.client import OpenAIClient
+from ..ai.client import AIClient
 from ..ai.functions import AI_FUNCTIONS, execute_function
 from .context_builder import ContextBuilder
 from .memory_service import MemoryService
@@ -17,7 +17,7 @@ class AIOrchestrator:
 
     def __init__(self, db: Session):
         self.db = db
-        self.client = OpenAIClient()
+        self.client = AIClient()
         self.context_builder = ContextBuilder(db)
         self.memory_service = MemoryService(db)
 
@@ -155,6 +155,7 @@ class AIOrchestrator:
                 function_results.append({
                     "tool_call_id": tool_call["id"],
                     "name": tool_call["name"],
+                    "arguments": tool_call["arguments"],
                     "result": result,
                 })
 
@@ -215,31 +216,32 @@ class AIOrchestrator:
             yield {"type": "finish", "finish_reason": "stop", "full_content": ""}
             return
 
-        # Add assistant message with tool calls
-        tool_calls_message = {
-            "role": "assistant",
-            "content": None,
-            "tool_calls": [
-                {
-                    "id": fr["tool_call_id"],
-                    "type": "function",
-                    "function": {
-                        "name": fr["name"],
-                        "arguments": json.dumps(fr["result"]),
-                    },
-                }
-                for fr in function_results
-            ],
-        }
-        messages.append(tool_calls_message)
-
-        # Add tool responses
+        # Add assistant message with tool use blocks (Anthropic format)
+        assistant_content = []
         for fr in function_results:
-            messages.append({
-                "role": "tool",
-                "tool_call_id": fr["tool_call_id"],
+            assistant_content.append({
+                "type": "tool_use",
+                "id": fr["tool_call_id"],
+                "name": fr["name"],
+                "input": fr.get("arguments", {}),
+            })
+        messages.append({
+            "role": "assistant",
+            "content": assistant_content,
+        })
+
+        # Add tool results in a user message (Anthropic format)
+        tool_results_content = []
+        for fr in function_results:
+            tool_results_content.append({
+                "type": "tool_result",
+                "tool_use_id": fr["tool_call_id"],
                 "content": json.dumps(fr["result"]),
             })
+        messages.append({
+            "role": "user",
+            "content": tool_results_content,
+        })
 
         # Get AI response and handle any additional tool calls
         new_function_results = []
@@ -255,6 +257,7 @@ class AIOrchestrator:
                 new_function_results.append({
                     "tool_call_id": tool_call["id"],
                     "name": tool_call["name"],
+                    "arguments": tool_call["arguments"],
                     "result": result,
                 })
                 yield chunk
